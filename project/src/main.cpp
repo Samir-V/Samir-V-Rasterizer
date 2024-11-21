@@ -68,7 +68,22 @@ int main(int argc, char* args[])
 				break;
 			case SDL_KEYUP:
 				if (e.key.keysym.scancode == SDL_SCANCODE_X)
+				{
 					takeScreenshot = true;
+					break;
+				}
+				if (e.key.keysym.scancode == SDL_SCANCODE_F4)
+				{
+					if (pRenderer->ColorMode == Renderer::ColorMode::FinalColor)
+					{
+						pRenderer->ColorMode = Renderer::ColorMode::DepthBuffer;
+					}
+					else
+					{
+						pRenderer->ColorMode = Renderer::ColorMode::FinalColor;
+					}
+					break;
+				}
 				break;
 			}
 		}

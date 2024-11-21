@@ -29,7 +29,10 @@ Renderer::Renderer(SDL_Window* pWindow) :
 
 	std::fill_n(m_pDepthBufferPixels, m_Width * m_Height, FLT_MAX);
 
+	//m_Texture = Texture::LoadFromFile("resources/tuktuk.png");
 	m_Texture = Texture::LoadFromFile("resources/uv_grid_2.png");
+
+	//Utils::ParseOBJ("resources/tuktuk.obj", m_WorldMeshes[0].vertices, m_WorldMeshes[0].indices);
 
 	//Initialize Camera
 	m_Camera.Initialize(60.f, { .0f,.0f,-10.f });
@@ -45,7 +48,15 @@ Renderer::~Renderer()
 void Renderer::Update(Timer* pTimer)
 {
 	m_Camera.Update(pTimer);
+	/*yaw += 1.f * pTimer->GetElapsed();
+	m_WorldMeshes[0].worldMatrix = Matrix::CreateRotationY(yaw);*/
 }
+
+float Renderer::Remap(float depthValue, float min, float max)
+{
+	return min + depthValue * (max - min);
+}
+
 
 void Renderer::Render()
 {
@@ -58,20 +69,22 @@ void Renderer::Render()
 
 	std::fill_n(m_pDepthBufferPixels, m_Width * m_Height, FLT_MAX);
 
-	std::vector<Vertex> vertices_world
-	{
-		// First triangle
-		//{{0.0f, 2.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-		//{{1.5f, -1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-		//{{-1.5f, -1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+	// Week - 1
 
-		//// Second triangle
-		//{{0.0f, 4.0f, 2.0f}, {1.0f, 0.0f, 0.0f}},
-		//{{3.0f, -2.0f, 2.0f}, {0.0f, 1.0f, 0.0f}},
-		//{{-3.0f, -2.0f, 2.0f}, {0.0f, 0.0f, 1.0f}},
-	};
+	//std::vector<Vertex> vertices_world
+	//{
+	//	// First triangle
+	//	//{{0.0f, 2.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+	//	//{{1.5f, -1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+	//	//{{-1.5f, -1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
 
-	std::vector<Mesh> meshes_world
+	//	//// Second triangle
+	//	//{{0.0f, 4.0f, 2.0f}, {1.0f, 0.0f, 0.0f}},
+	//	//{{3.0f, -2.0f, 2.0f}, {0.0f, 1.0f, 0.0f}},
+	//	//{{-3.0f, -2.0f, 2.0f}, {0.0f, 0.0f, 1.0f}},
+	//};
+
+	/*std::vector<Mesh> meshes_world
 	{
 		Mesh{
 			{
@@ -93,7 +106,7 @@ void Renderer::Render()
 
 			PrimitiveTopology::TriangleStrip
 		}
-	};
+	};*/
 
 	/*std::vector<Mesh> meshes_world
 	{
@@ -119,9 +132,9 @@ void Renderer::Render()
 		}
 	};*/
 
-	meshes_world[0].vertices_out.reserve(meshes_world[0].vertices.size());
+	m_WorldMeshes[0].vertices_out.reserve(m_WorldMeshes[0].vertices.size());
 
-	VertexTransformationFunction(meshes_world[0].vertices, meshes_world[0].vertices_out);
+	VertexTransformationFunction(m_WorldMeshes[0].vertices, m_WorldMeshes[0].vertices_out);
 
 	Vertex_Out firstVertex;
 	Vertex_Out secondVertex;
@@ -131,54 +144,60 @@ void Renderer::Render()
 	size_t index1;
 	size_t index2;
 
-	for (size_t index{ 0 }; index < meshes_world[0].indices.size();)
+	for (size_t index{ 0 }; index < m_WorldMeshes[0].indices.size();)
 	{
-		if (meshes_world[0].primitiveTopology == PrimitiveTopology::TriangleStrip)
+		if (m_WorldMeshes[0].primitiveTopology == PrimitiveTopology::TriangleStrip)
 		{
-			if (index + 2 >= meshes_world[0].indices.size())
+			if (index + 2 >= m_WorldMeshes[0].indices.size())
 			{
 				break;
 			}
 
 			if (index % 2 == 0)
 			{
-				index0 = meshes_world[0].indices[index];
-				index1 = meshes_world[0].indices[index + 1];
-				index2 = meshes_world[0].indices[index + 2];
+				index0 = m_WorldMeshes[0].indices[index];
+				index1 = m_WorldMeshes[0].indices[index + 1];
+				index2 = m_WorldMeshes[0].indices[index + 2];
 
-				firstVertex = meshes_world[0].vertices_out[index0];
-				secondVertex = meshes_world[0].vertices_out[index1];
-				thirdVertex = meshes_world[0].vertices_out[index2];
+				firstVertex = m_WorldMeshes[0].vertices_out[index0];
+				secondVertex = m_WorldMeshes[0].vertices_out[index1];
+				thirdVertex = m_WorldMeshes[0].vertices_out[index2];
 			}
 			else
 			{
-				index0 = meshes_world[0].indices[index];
-				index1 = meshes_world[0].indices[index + 2];
-				index2 = meshes_world[0].indices[index + 1];
+				index0 = m_WorldMeshes[0].indices[index];
+				index1 = m_WorldMeshes[0].indices[index + 2];
+				index2 = m_WorldMeshes[0].indices[index + 1];
 
-				firstVertex = meshes_world[0].vertices_out[index0];
-				secondVertex = meshes_world[0].vertices_out[index1];
-				thirdVertex = meshes_world[0].vertices_out[index2];
+				firstVertex = m_WorldMeshes[0].vertices_out[index0];
+				secondVertex = m_WorldMeshes[0].vertices_out[index1];
+				thirdVertex = m_WorldMeshes[0].vertices_out[index2];
 			}
 
 			++index;
 		}
-		else if (meshes_world[0].primitiveTopology == PrimitiveTopology::TriangleList)
+		else if (m_WorldMeshes[0].primitiveTopology == PrimitiveTopology::TriangleList)
 		{
-			if (index + 2 >= meshes_world[0].indices.size())
+			if (index + 2 >= m_WorldMeshes[0].indices.size())
 			{
 				break;
 			}
 
-			index0 = meshes_world[0].indices[index];
-			index1 = meshes_world[0].indices[index + 1];
-			index2 = meshes_world[0].indices[index + 2];
+			index0 = m_WorldMeshes[0].indices[index];
+			index1 = m_WorldMeshes[0].indices[index + 1];
+			index2 = m_WorldMeshes[0].indices[index + 2];
 
-			firstVertex = meshes_world[0].vertices_out[index0];
-			secondVertex = meshes_world[0].vertices_out[index1];
-			thirdVertex = meshes_world[0].vertices_out[index2];
+			firstVertex = m_WorldMeshes[0].vertices_out[index0];
+			secondVertex = m_WorldMeshes[0].vertices_out[index1];
+			thirdVertex = m_WorldMeshes[0].vertices_out[index2];
 
 			index += 3;
+		}
+
+		// If the z component is further than far and smaller than near - skip the current calculation
+		if (!(firstVertex.position.z > 0 && firstVertex.position.z < 1) || !(secondVertex.position.z > 0 && secondVertex.position.z < 1) || !(thirdVertex.position.z > 0 && thirdVertex.position.z < 1))
+		{
+			continue;
 		}
 
 		auto stepMinX = std::min(firstVertex.position.x, secondVertex.position.x);
@@ -190,14 +209,14 @@ void Renderer::Render()
 		// Bounding box coordinates
 		Vector2 topLeft
 		{
-			std::min(stepMinX, thirdVertex.position.x),
-			std::min(stepMinY, thirdVertex.position.y)
+			round(std::min(stepMinX, thirdVertex.position.x)),
+			round(std::min(stepMinY, thirdVertex.position.y))
 		};
 
 		Vector2 botRight
 		{
-			std::max(stepMaxX, thirdVertex.position.x),
-			std::max(stepMaxY, thirdVertex.position.y)
+			round(std::max(stepMaxX, thirdVertex.position.x)),
+			round(std::max(stepMaxY, thirdVertex.position.y))
 		};
 
 		// Does not exceed screen (Pixels are not floats)
@@ -215,8 +234,6 @@ void Renderer::Render()
 			for (int py{}; py < m_Height; ++py)
 			{
 				if (py < topLeft.y || py > botRight.y) continue;
-
-				//if (firstVertex.position.w < 0 || secondVertex.position.w < 0 || thirdVertex.position.w < 0) continue;
 
 				Vector2 currentPixel{ px + 0.5f, py + 0.5f };
 
@@ -255,8 +272,9 @@ void Renderer::Render()
 				// Calculating the interpolated depth
 				auto zBuffer = 1 / (1 / firstVertex.position.z * weightV0 + 1 / secondVertex.position.z * weightV1 + 1 / thirdVertex.position.z * weightV2);
 
-				if (zBuffer < 0) continue;
-				if (zBuffer > 1) continue;
+				// Not needed?
+				/*if (zBuffer < 0) continue;
+				if (zBuffer > 1) continue;*/
 
 				if (zBuffer < m_pDepthBufferPixels[px + (py * m_Width)])
 				{
@@ -265,15 +283,30 @@ void Renderer::Render()
 					auto interWDepth = 1 / (1 / firstVertex.position.w * weightV0 + 1 / secondVertex.position.w * weightV1 + 1 / thirdVertex.position.w * weightV2);
 
 					// Calculating the interpolated colour of the pixel
+
 					/*ColorRGB interColour = (firstVertex.color / firstVertex.position.z * weightV0 + secondVertex.color / secondVertex.position.z * weightV1 + thirdVertex.color / thirdVertex.position.z * weightV2) * interDepth;
 
 					ColorRGB finalColour = interColour;*/
 
 
 					// Calculating the interpolated UV coordinates
+
 					auto interUV = (firstVertex.uv / firstVertex.position.w * weightV0 + secondVertex.uv / secondVertex.position.w * weightV1 + thirdVertex.uv / thirdVertex.position.w * weightV2) * interWDepth;
 
-					ColorRGB finalColour = m_Texture->Sample(interUV);
+					ColorRGB finalColour;
+
+					if (ColorMode == ColorMode::FinalColor)
+					{
+						finalColour = m_Texture->Sample(interUV);	
+					}
+					else if (ColorMode == ColorMode::DepthBuffer)
+					{
+						float depthValue = Remap(zBuffer, 0.995f, 1.0f);
+
+						float colorValue = (depthValue - 0.995f) / (1.0f - 0.995f);
+
+						finalColour = ColorRGB{ colorValue, colorValue, colorValue };
+					}
 
 					//Update Color in Buffer
 					finalColour.MaxToOne();
@@ -303,7 +336,7 @@ void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_
 	for (size_t index{0}; index < vertices_in.size(); ++index)
 	{
 		// Step 1. From world to Camera space + Step 3. Projection
-		Matrix megaMartix = m_Camera.viewMatrix * Matrix::CreatePerspectiveFovLH(m_Camera.fov, m_Camera.aspectRatio, m_Camera.near, m_Camera.far);
+		Matrix megaMartix = m_WorldMeshes[0].worldMatrix * m_Camera.viewMatrix * Matrix::CreatePerspectiveFovLH(m_Camera.fov, m_Camera.aspectRatio, m_Camera.near, m_Camera.far);
 
 		Vector4 transformedPoint = megaMartix.TransformPoint(vertices_in[index].position.ToVector4());
 		tempVector.emplace_back(transformedPoint, vertices_in[index].color, vertices_in[index].uv);
@@ -324,7 +357,7 @@ void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_
 		tempVector[index].position.x = (tempVector[index].position.x + 1) / 2.0f * m_Width;
 		tempVector[index].position.y = (1 - tempVector[index].position.y) / 2.0f * m_Height;
 	}
-
+		
 	vertices_out = std::move(tempVector);
 }
 
