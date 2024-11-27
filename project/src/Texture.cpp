@@ -49,6 +49,6 @@ namespace dae
 
 		SDL_GetRGB(pixel, m_pSurface->format, &r, &g, &b);
 
-		return ColorRGB{ r / 255.0f, g / 255.0f, b / 255.0f };
+		return ColorRGB{ r / 1.0f, g / 1.0f, b / 1.0f };
 	}
 }

@@ -29,19 +29,20 @@ Renderer::Renderer(SDL_Window* pWindow) :
 
 	std::fill_n(m_pDepthBufferPixels, m_Width * m_Height, FLT_MAX);
 
-	m_Texture = Texture::LoadFromFile("resources/vehicle_diffuse.png");
+	m_Texture = std::make_unique<Texture>(*Texture::LoadFromFile("resources/vehicle_diffuse.png"));
+	m_NormalMap = std::make_unique<Texture>(*Texture::LoadFromFile("resources/vehicle_normal.png"));
+
 	//m_Texture = Texture::LoadFromFile("resources/uv_grid_2.png");
 
 	Utils::ParseOBJ("resources/vehicle.obj", m_WorldMeshes[0].vertices, m_WorldMeshes[0].indices);
 
 	//Initialize Camera
-	m_Camera.Initialize(60.f, { .0f,.0f,-50.f });
+	m_Camera.Initialize(45.f, { .0f, .0f, -50.f });
 	m_Camera.aspectRatio = static_cast<float>(m_Width) / static_cast<float>(m_Height);
 }
 
 Renderer::~Renderer()
 {
-	delete m_Texture;
 	delete[] m_pDepthBufferPixels;
 }
 
@@ -64,7 +65,7 @@ void Renderer::Render()
 	//Lock BackBuffer
 	SDL_LockSurface(m_pBackBuffer);
 
-	Uint32 clearColor = SDL_MapRGB(m_pBackBuffer->format, 0, 0, 0);
+	Uint32 clearColor = SDL_MapRGB(m_pBackBuffer->format, 128, 128, 128);
 	SDL_FillRect(m_pBackBuffer, nullptr, clearColor);
 
 	std::fill_n(m_pDepthBufferPixels, m_Width * m_Height, FLT_MAX);
@@ -272,9 +273,10 @@ void Renderer::Render()
 					{
 						const auto interUV = (firstVertex.uv / firstVertex.position.w * weightV0 + secondVertex.uv / secondVertex.position.w * weightV1 + thirdVertex.uv / thirdVertex.position.w * weightV2) * interWDepth;
 						const auto sampledColour = m_Texture->Sample(interUV);
-						const auto normal = Vector3((firstVertex.normal / firstVertex.position.w * weightV0 + secondVertex.normal / secondVertex.position.w * weightV1 + thirdVertex.normal / thirdVertex.position.w * weightV2) * interWDepth);
+						const auto normal = Vector3(firstVertex.normal * weightV0 + secondVertex.normal * weightV1 + thirdVertex.normal * weightV2);
+						const auto tangent = Vector3(firstVertex.tangent * weightV0 + secondVertex.tangent * weightV1 + thirdVertex.tangent * weightV2);
 
-						const Vertex_Out pixelVertexData{ {}, sampledColour, interUV, normal, {} };
+						const Vertex_Out pixelVertexData{ {}, sampledColour, interUV, normal, tangent };
 
 						finalColour = PixelShading(pixelVertexData);
 					}
@@ -332,8 +334,7 @@ void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_
 
 		// Step for normal calculations
 		tempVector[index].normal = worldMatrix.TransformVector(vertices_in[index].normal);
-
-		auto check = tempVector[index].normal;
+		tempVector[index].tangent = worldMatrix.TransformVector(vertices_in[index].tangent);
 	}
 
 	// Step 4. Converting to Raster Space (Screen Space)
@@ -348,11 +349,24 @@ void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_
 
 ColorRGB Renderer::PixelShading(const Vertex_Out& v)
 {
+	Vector3 binormal = Vector3::Cross(v.normal, v.tangent);
+	Matrix tangentToWorldMatrix = Matrix{ v.tangent, binormal, v.normal, Vector3::Zero };
+
+	ColorRGB normalMapColour = m_NormalMap->Sample(v.uv);
+
+	Vector3 sampledNormal = Vector3{ normalMapColour.r, normalMapColour.g, normalMapColour.b };
+
+	sampledNormal /= 255.0f;
+	sampledNormal = 2.0f * sampledNormal - Vector3{ 1.0f, 1.0f, 1.0f };
+
+	sampledNormal = tangentToWorldMatrix.TransformVector(sampledNormal);
+	sampledNormal.Normalize();
+
 	const float kd{ 7.0f };
 	const Vector3 lightDirection{ 0.577f, -0.577f, 0.577f };
 
 	const ColorRGB lambertBRDF{ (kd * v.color) / M_PI };
-	const float observedArea{ std::max(Vector3::Dot(v.normal, lightDirection), 0.0f) };
+	const float observedArea{ std::max(Vector3::Dot(sampledNormal, -lightDirection), 0.0f) };
 
 	const ColorRGB outColor{ (lambertBRDF * observedArea) / 255.0f };
 	return outColor;

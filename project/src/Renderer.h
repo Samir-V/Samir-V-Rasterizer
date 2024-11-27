@@ -64,7 +64,10 @@ namespace dae
 		float* m_pDepthBufferPixels{};
 
 		Camera m_Camera{};
-		Texture* m_Texture{nullptr};
+
+		std::unique_ptr<Texture> m_Texture;
+		std::unique_ptr<Texture> m_NormalMap;
+
 		std::vector<Mesh> m_WorldMeshes{
 			Mesh
 			{

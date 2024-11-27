@@ -34,7 +34,7 @@ namespace dae
 		float near{1.0f};
 		float far{1000.0f};
 
-		const float movementSpeed{ 3.0f };
+		const float movementSpeed{ 10.0f };
 		const float rotSpeed{ 0.1f };
 
 		Matrix invViewMatrix{};
