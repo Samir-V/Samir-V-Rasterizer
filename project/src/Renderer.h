@@ -41,6 +41,7 @@ namespace dae
 		bool SaveBufferToImage() const;
 
 		void VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex_Out>& vertices_out) const;
+		ColorRGB PixelShading(const Vertex_Out& v);
 		float Remap(float depthValue, float min, float max);
 
 		enum class ColorMode
@@ -65,14 +66,15 @@ namespace dae
 		Camera m_Camera{};
 		Texture* m_Texture{nullptr};
 		std::vector<Mesh> m_WorldMeshes{
-			/*Mesh
+			Mesh
 			{
 				{},
 				{},
-				PrimitiveTopology::TriangleList
-			}*/
+				PrimitiveTopology::TriangleList,
+				{}
+			}
 
-			Mesh{
+			/*Mesh{
 					{
 				{{-3.0f, 3.0f, -2.0f}, colors::White, Vector2{0.0f, 0.0f}},
 				{{0.0f, 3.0f, -2.0f}, colors::White, Vector2{0.5f, 0.0f}},
@@ -91,7 +93,7 @@ namespace dae
 					},
 
 					PrimitiveTopology::TriangleStrip
-				}
+				}*/
 		};
 
 		int m_Width{};

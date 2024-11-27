@@ -29,13 +29,13 @@ Renderer::Renderer(SDL_Window* pWindow) :
 
 	std::fill_n(m_pDepthBufferPixels, m_Width * m_Height, FLT_MAX);
 
-	//m_Texture = Texture::LoadFromFile("resources/tuktuk.png");
-	m_Texture = Texture::LoadFromFile("resources/uv_grid_2.png");
+	m_Texture = Texture::LoadFromFile("resources/vehicle_diffuse.png");
+	//m_Texture = Texture::LoadFromFile("resources/uv_grid_2.png");
 
-	//Utils::ParseOBJ("resources/tuktuk.obj", m_WorldMeshes[0].vertices, m_WorldMeshes[0].indices);
+	Utils::ParseOBJ("resources/vehicle.obj", m_WorldMeshes[0].vertices, m_WorldMeshes[0].indices);
 
 	//Initialize Camera
-	m_Camera.Initialize(60.f, { .0f,.0f,-10.f });
+	m_Camera.Initialize(60.f, { .0f,.0f,-50.f });
 	m_Camera.aspectRatio = static_cast<float>(m_Width) / static_cast<float>(m_Height);
 }
 
@@ -84,29 +84,7 @@ void Renderer::Render()
 	//	//{{-3.0f, -2.0f, 2.0f}, {0.0f, 0.0f, 1.0f}},
 	//};
 
-	/*std::vector<Mesh> meshes_world
-	{
-		Mesh{
-			{
-		{{-3.0f, 3.0f, -2.0f}, colors::White, Vector2{0.0f, 0.0f}},
-		{{0.0f, 3.0f, -2.0f}, colors::White, Vector2{0.5f, 0.0f}},
-		{{3.0f, 3.0f, -2.0f}, colors::White, Vector2{1.0f, 0.0f}},
-		{{-3.0f, 0.0f, -2.0f}, colors::White, Vector2{0.0f, 0.5f}},
-		{{0.0f, 0.0f, -2.0f}, colors::White, Vector2{0.5f, 0.5f}},
-		{{3.0f, 0.0f, -2.0f}, colors::White, Vector2{1.0f, 0.5f}},
-		{{-3.0f, -3.0f, -2.0f}, colors::White, Vector2{0.0f, 1.0f}},
-		{{0.0f, -3.0f, -2.0f}, colors::White, Vector2{0.5f, 1.0f}},
-		{{3.0f, -3.0f, -2.0f}, colors::White, Vector2{1.0f, 1.0f}},
-		},
-			{
-				3, 0, 4, 1, 5, 2,
-				2, 6,
-				6, 3, 7, 4, 8, 5
-			},
 
-			PrimitiveTopology::TriangleStrip
-		}
-	};*/
 
 	/*std::vector<Mesh> meshes_world
 	{
@@ -209,14 +187,14 @@ void Renderer::Render()
 		// Bounding box coordinates
 		Vector2 topLeft
 		{
-			round(std::min(stepMinX, thirdVertex.position.x)),
-			round(std::min(stepMinY, thirdVertex.position.y))
+			std::floor(std::min(stepMinX, thirdVertex.position.x)),
+			std::floor(std::min(stepMinY, thirdVertex.position.y))
 		};
 
 		Vector2 botRight
 		{
-			round(std::max(stepMaxX, thirdVertex.position.x)),
-			round(std::max(stepMaxY, thirdVertex.position.y))
+			std::ceil(std::max(stepMaxX, thirdVertex.position.x)),
+			std::ceil(std::max(stepMaxY, thirdVertex.position.y))
 		};
 
 		// Does not exceed screen (Pixels are not floats)
@@ -288,16 +266,17 @@ void Renderer::Render()
 
 					ColorRGB finalColour = interColour;*/
 
-
-					// Calculating the interpolated UV coordinates
-
-					auto interUV = (firstVertex.uv / firstVertex.position.w * weightV0 + secondVertex.uv / secondVertex.position.w * weightV1 + thirdVertex.uv / thirdVertex.position.w * weightV2) * interWDepth;
-
 					ColorRGB finalColour;
 
 					if (ColorMode == ColorMode::FinalColor)
 					{
-						finalColour = m_Texture->Sample(interUV);	
+						const auto interUV = (firstVertex.uv / firstVertex.position.w * weightV0 + secondVertex.uv / secondVertex.position.w * weightV1 + thirdVertex.uv / thirdVertex.position.w * weightV2) * interWDepth;
+						const auto sampledColour = m_Texture->Sample(interUV);
+						const auto normal = Vector3((firstVertex.normal / firstVertex.position.w * weightV0 + secondVertex.normal / secondVertex.position.w * weightV1 + thirdVertex.normal / thirdVertex.position.w * weightV2) * interWDepth);
+
+						const Vertex_Out pixelVertexData{ {}, sampledColour, interUV, normal, {} };
+
+						finalColour = PixelShading(pixelVertexData);
 					}
 					else if (ColorMode == ColorMode::DepthBuffer)
 					{
@@ -333,12 +312,13 @@ void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_
 
 	tempVector.reserve(vertices_in.size());
 
+	const Matrix worldMatrix = m_WorldMeshes[0].worldMatrix;
+	const Matrix megaMatrix = worldMatrix * m_Camera.viewMatrix * Matrix::CreatePerspectiveFovLH(m_Camera.fov, m_Camera.aspectRatio, m_Camera.near, m_Camera.far);
+
 	for (size_t index{0}; index < vertices_in.size(); ++index)
 	{
 		// Step 1. From world to Camera space + Step 3. Projection
-		Matrix megaMartix = m_WorldMeshes[0].worldMatrix * m_Camera.viewMatrix * Matrix::CreatePerspectiveFovLH(m_Camera.fov, m_Camera.aspectRatio, m_Camera.near, m_Camera.far);
-
-		Vector4 transformedPoint = megaMartix.TransformPoint(vertices_in[index].position.ToVector4());
+		Vector4 transformedPoint = megaMatrix.TransformPoint(vertices_in[index].position.ToVector4());
 		tempVector.emplace_back(transformedPoint, vertices_in[index].color, vertices_in[index].uv);
 
 		// Step 2. Perspective divide
@@ -349,6 +329,11 @@ void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_
 		// Step 3. Converting to NDC projective stage - Not used, since it is the part of the Matrix above
 		// tempVector[index].position.x = tempVector[index].position.x / (m_Camera.aspectRatio * m_Camera.fov);
 		// tempVector[index].position.y = tempVector[index].position.y / m_Camera.fov;
+
+		// Step for normal calculations
+		tempVector[index].normal = worldMatrix.TransformVector(vertices_in[index].normal);
+
+		auto check = tempVector[index].normal;
 	}
 
 	// Step 4. Converting to Raster Space (Screen Space)
@@ -361,7 +346,21 @@ void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_
 	vertices_out = std::move(tempVector);
 }
 
+ColorRGB Renderer::PixelShading(const Vertex_Out& v)
+{
+	const float kd{ 7.0f };
+	const Vector3 lightDirection{ 0.577f, -0.577f, 0.577f };
+
+	const ColorRGB lambertBRDF{ (kd * v.color) / M_PI };
+	const float observedArea{ std::max(Vector3::Dot(v.normal, lightDirection), 0.0f) };
+
+	const ColorRGB outColor{ (lambertBRDF * observedArea) / 255.0f };
+	return outColor;
+}
+
 bool Renderer::SaveBufferToImage() const
 {
 	return SDL_SaveBMP(m_pBackBuffer, "Rasterizer_ColorBuffer.bmp");
 }
+
+
