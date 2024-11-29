@@ -31,6 +31,10 @@ Renderer::Renderer(SDL_Window* pWindow) :
 
 	m_Texture = std::make_unique<Texture>(*Texture::LoadFromFile("resources/vehicle_diffuse.png"));
 	m_NormalMap = std::make_unique<Texture>(*Texture::LoadFromFile("resources/vehicle_normal.png"));
+	m_SpecularMap = std::make_unique<Texture>(*Texture::LoadFromFile("resources/vehicle_specular.png"));
+	m_GlossMap = std::make_unique<Texture>(*Texture::LoadFromFile("resources/vehicle_gloss.png"));
+
+	m_Shininess = 25.0f;
 
 	//m_Texture = Texture::LoadFromFile("resources/uv_grid_2.png");
 
@@ -174,7 +178,7 @@ void Renderer::Render()
 		}
 
 		// If the z component is further than far and smaller than near - skip the current calculation
-		if (!(firstVertex.position.z > 0 && firstVertex.position.z < 1) || !(secondVertex.position.z > 0 && secondVertex.position.z < 1) || !(thirdVertex.position.z > 0 && thirdVertex.position.z < 1))
+		if (!(firstVertex.position.z > FLT_EPSILON && firstVertex.position.z < 1) || !(secondVertex.position.z > FLT_EPSILON && secondVertex.position.z < 1) || !(thirdVertex.position.z > FLT_EPSILON && thirdVertex.position.z < 1))
 		{
 			continue;
 		}
@@ -275,8 +279,10 @@ void Renderer::Render()
 						const auto sampledColour = m_Texture->Sample(interUV);
 						const auto normal = Vector3(firstVertex.normal * weightV0 + secondVertex.normal * weightV1 + thirdVertex.normal * weightV2);
 						const auto tangent = Vector3(firstVertex.tangent * weightV0 + secondVertex.tangent * weightV1 + thirdVertex.tangent * weightV2);
+						const Vector3 pos = firstVertex.position * weightV0 + secondVertex.position * weightV1 + thirdVertex.position * weightV2;
+						const auto viewDir = (pos - m_Camera.origin).Normalized();
 
-						const Vertex_Out pixelVertexData{ {}, sampledColour, interUV, normal, tangent };
+						const Vertex_Out pixelVertexData{ {}, sampledColour, interUV, normal, tangent, viewDir };
 
 						finalColour = PixelShading(pixelVertexData);
 					}
@@ -332,7 +338,7 @@ void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_
 		// tempVector[index].position.x = tempVector[index].position.x / (m_Camera.aspectRatio * m_Camera.fov);
 		// tempVector[index].position.y = tempVector[index].position.y / m_Camera.fov;
 
-		// Step for normal calculations
+		// Step for additional info calculations
 		tempVector[index].normal = worldMatrix.TransformVector(vertices_in[index].normal);
 		tempVector[index].tangent = worldMatrix.TransformVector(vertices_in[index].tangent);
 	}
@@ -349,12 +355,15 @@ void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_
 
 ColorRGB Renderer::PixelShading(const Vertex_Out& v)
 {
-	Vector3 binormal = Vector3::Cross(v.normal, v.tangent);
-	Matrix tangentToWorldMatrix = Matrix{ v.tangent, binormal, v.normal, Vector3::Zero };
+	const Vector3 binormal = Vector3::Cross(v.normal, v.tangent);
+	const auto tangentToWorldMatrix = Matrix{ v.tangent, binormal, v.normal, Vector3::Zero };
 
-	ColorRGB normalMapColour = m_NormalMap->Sample(v.uv);
+	const ColorRGB normalMapColour = m_NormalMap->Sample(v.uv);
+	const ColorRGB specularMapColour = m_SpecularMap->Sample(v.uv) * m_Shininess;
+	const float glossMapValue = m_GlossMap->Sample(v.uv).r;
 
-	Vector3 sampledNormal = Vector3{ normalMapColour.r, normalMapColour.g, normalMapColour.b };
+	// Sampling normal map
+	auto sampledNormal = Vector3{ normalMapColour.r, normalMapColour.g, normalMapColour.b };
 
 	sampledNormal /= 255.0f;
 	sampledNormal = 2.0f * sampledNormal - Vector3{ 1.0f, 1.0f, 1.0f };
@@ -362,13 +371,23 @@ ColorRGB Renderer::PixelShading(const Vertex_Out& v)
 	sampledNormal = tangentToWorldMatrix.TransformVector(sampledNormal);
 	sampledNormal.Normalize();
 
-	const float kd{ 7.0f };
+	// Calculating observed Area
 	const Vector3 lightDirection{ 0.577f, -0.577f, 0.577f };
-
-	const ColorRGB lambertBRDF{ (kd * v.color) / M_PI };
 	const float observedArea{ std::max(Vector3::Dot(sampledNormal, -lightDirection), 0.0f) };
 
-	const ColorRGB outColor{ (lambertBRDF * observedArea) / 255.0f };
+	// Calculating the colour
+	const float kd{ 7.0f };
+	const ColorRGB lambertBRDF{ (kd * v.color) / M_PI };
+
+	// Calculating phong
+	auto reflect = Vector3::Reflect(-lightDirection, sampledNormal);
+	auto cosa = abs(Vector3::Dot(reflect, v.viewDirection));
+
+	const float phong = 0.5f * powf(cosa, glossMapValue);
+
+	const ColorRGB specColour = phong * specularMapColour;
+
+	const ColorRGB outColor{ (lambertBRDF * observedArea + specColour) / 255.0f };
 	return outColor;
 }
 

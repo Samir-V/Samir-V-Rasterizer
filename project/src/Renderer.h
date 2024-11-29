@@ -67,6 +67,10 @@ namespace dae
 
 		std::unique_ptr<Texture> m_Texture;
 		std::unique_ptr<Texture> m_NormalMap;
+		std::unique_ptr<Texture> m_SpecularMap;
+		std::unique_ptr<Texture> m_GlossMap;
+
+		float m_Shininess{};
 
 		std::vector<Mesh> m_WorldMeshes{
 			Mesh
