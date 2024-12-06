@@ -35,13 +35,13 @@ Renderer::Renderer(SDL_Window* pWindow) :
 	m_GlossMap = std::make_unique<Texture>(*Texture::LoadFromFile("resources/vehicle_gloss.png"));
 
 	m_Shininess = 25.0f;
-
-	//m_Texture = Texture::LoadFromFile("resources/uv_grid_2.png");
+	m_Kd = 7.0f;
+	m_Ks = 0.5f;
 
 	Utils::ParseOBJ("resources/vehicle.obj", m_WorldMeshes[0].vertices, m_WorldMeshes[0].indices);
 
 	//Initialize Camera
-	m_Camera.Initialize(45.f, { .0f, .0f, -50.f });
+	m_Camera.Initialize(45.f, { .0f, .0f, 0.f });
 	m_Camera.aspectRatio = static_cast<float>(m_Width) / static_cast<float>(m_Height);
 }
 
@@ -53,8 +53,21 @@ Renderer::~Renderer()
 void Renderer::Update(Timer* pTimer)
 {
 	m_Camera.Update(pTimer);
-	/*yaw += 1.f * pTimer->GetElapsed();
-	m_WorldMeshes[0].worldMatrix = Matrix::CreateRotationY(yaw);*/
+
+	if (m_RotationOn)
+	{
+		yaw = 1.0f * pTimer->GetElapsed();
+
+		const Vector3 translation{ m_WorldMeshes[0].worldMatrix.GetTranslation() };
+
+		const Matrix translationMatrix = Matrix::CreateTranslation(translation);
+		const Matrix reverseTranslationMatrix = Matrix::CreateTranslation(-translation);
+		const Matrix rotationMatrix = Matrix::CreateRotationY(yaw);
+
+		m_WorldMeshes[0].worldMatrix *= reverseTranslationMatrix;
+		m_WorldMeshes[0].worldMatrix *= rotationMatrix;
+		m_WorldMeshes[0].worldMatrix *= translationMatrix;
+	}
 }
 
 float Renderer::Remap(float depthValue, float min, float max)
@@ -73,47 +86,6 @@ void Renderer::Render()
 	SDL_FillRect(m_pBackBuffer, nullptr, clearColor);
 
 	std::fill_n(m_pDepthBufferPixels, m_Width * m_Height, FLT_MAX);
-
-	// Week - 1
-
-	//std::vector<Vertex> vertices_world
-	//{
-	//	// First triangle
-	//	//{{0.0f, 2.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-	//	//{{1.5f, -1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-	//	//{{-1.5f, -1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-
-	//	//// Second triangle
-	//	//{{0.0f, 4.0f, 2.0f}, {1.0f, 0.0f, 0.0f}},
-	//	//{{3.0f, -2.0f, 2.0f}, {0.0f, 1.0f, 0.0f}},
-	//	//{{-3.0f, -2.0f, 2.0f}, {0.0f, 0.0f, 1.0f}},
-	//};
-
-
-
-	/*std::vector<Mesh> meshes_world
-	{
-		Mesh{
-			{
-		{{-3.0f, 3.0f, -2.0f}, colors::White, Vector2{0.0f, 0.0f}},
-		{{0.0f, 3.0f, -2.0f}, colors::White, Vector2{0.5f, 0.0f}},
-		{{3.0f, 3.0f, -2.0f}, colors::White, Vector2{1.0f, 0.0f}},
-		{{-3.0f, 0.0f, -2.0f}, colors::White, Vector2{0.0f, 0.5f}},
-		{{0.0f, 0.0f, -2.0f}, colors::White, Vector2{0.5f, 0.5f}},
-		{{3.0f, 0.0f, -2.0f}, colors::White, Vector2{1.0f, 0.5f}},
-		{{-3.0f, -3.0f, -2.0f}, colors::White, Vector2{0.0f, 1.0f}},
-		{{0.0f, -3.0f, -2.0f}, colors::White, Vector2{0.5f, 0.1f}},
-		{{3.0f, -3.0f, -2.0f}, colors::White, Vector2{1.0f, 1.0f}},
-		},
-			{
-				3, 0, 1,    1, 4, 3,    4, 1, 2,
-				2, 5, 4,    6, 3, 4,    4, 7, 6,
-				7, 4, 5,    5, 8, 7
-			},
-
-			PrimitiveTopology::TriangleList
-		}
-	};*/
 
 	m_WorldMeshes[0].vertices_out.reserve(m_WorldMeshes[0].vertices.size());
 
@@ -183,6 +155,15 @@ void Renderer::Render()
 			continue;
 		}
 
+		Vector2 V0{ firstVertex.position.x, firstVertex.position.y };
+		Vector2 V1{ secondVertex.position.x, secondVertex.position.y };
+		Vector2 V2{ thirdVertex.position.x, thirdVertex.position.y };
+
+		if (V0 == V1 || V1 == V2 || V2 == V0)
+		{
+			return;
+		}
+
 		auto stepMinX = std::min(firstVertex.position.x, secondVertex.position.x);
 		auto stepMinY = std::min(firstVertex.position.y, secondVertex.position.y);
 
@@ -192,8 +173,8 @@ void Renderer::Render()
 		// Bounding box coordinates
 		Vector2 topLeft
 		{
-			std::floor(std::min(stepMinX, thirdVertex.position.x)),
-			std::floor(std::min(stepMinY, thirdVertex.position.y))
+			std::min(stepMinX, thirdVertex.position.x),
+			std::min(stepMinY, thirdVertex.position.y)
 		};
 
 		Vector2 botRight
@@ -210,19 +191,11 @@ void Renderer::Render()
 		botRight.y = int(std::max(0.0f, std::min(botRight.y, static_cast<float>(m_Height - 1))));
 
 		//RENDER LOGIC
-		for (int px{}; px < m_Width; ++px)
+		for (int px{int(topLeft.x)}; px < int(botRight.x); ++px)
 		{
-			if (px < topLeft.x || px > botRight.x) continue;
-
-			for (int py{}; py < m_Height; ++py)
+			for (int py{int(topLeft.y)}; py < int(botRight.y); ++py)
 			{
-				if (py < topLeft.y || py > botRight.y) continue;
-
 				Vector2 currentPixel{ px + 0.5f, py + 0.5f };
-
-				Vector2 V0{ firstVertex.position.x, firstVertex.position.y };
-				Vector2 V1{ secondVertex.position.x, secondVertex.position.y };
-				Vector2 V2{ thirdVertex.position.x, thirdVertex.position.y };
 
 				auto eVector = V1 - V0;
 				auto pVector = currentPixel - V0;
@@ -255,9 +228,8 @@ void Renderer::Render()
 				// Calculating the interpolated depth
 				auto zBuffer = 1 / (1 / firstVertex.position.z * weightV0 + 1 / secondVertex.position.z * weightV1 + 1 / thirdVertex.position.z * weightV2);
 
-				// Not needed?
-				/*if (zBuffer < 0) continue;
-				if (zBuffer > 1) continue;*/
+				if (zBuffer < 0) continue;
+				if (zBuffer > 1) continue;
 
 				if (zBuffer < m_pDepthBufferPixels[px + (py * m_Width)])
 				{
@@ -265,15 +237,9 @@ void Renderer::Render()
 
 					auto interWDepth = 1 / (1 / firstVertex.position.w * weightV0 + 1 / secondVertex.position.w * weightV1 + 1 / thirdVertex.position.w * weightV2);
 
-					// Calculating the interpolated colour of the pixel
-
-					/*ColorRGB interColour = (firstVertex.color / firstVertex.position.z * weightV0 + secondVertex.color / secondVertex.position.z * weightV1 + thirdVertex.color / thirdVertex.position.z * weightV2) * interDepth;
-
-					ColorRGB finalColour = interColour;*/
-
 					ColorRGB finalColour;
 
-					if (ColorMode == ColorMode::FinalColor)
+					if (!m_DepthBufferView)
 					{
 						const auto interUV = (firstVertex.uv / firstVertex.position.w * weightV0 + secondVertex.uv / secondVertex.position.w * weightV1 + thirdVertex.uv / thirdVertex.position.w * weightV2) * interWDepth;
 						const auto sampledColour = m_Texture->Sample(interUV);
@@ -286,7 +252,7 @@ void Renderer::Render()
 
 						finalColour = PixelShading(pixelVertexData);
 					}
-					else if (ColorMode == ColorMode::DepthBuffer)
+					else if (m_DepthBufferView)
 					{
 						float depthValue = Remap(zBuffer, 0.995f, 1.0f);
 
@@ -334,16 +300,12 @@ void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_
 		tempVector[index].position.y = tempVector[index].position.y / tempVector[index].position.w;
 		tempVector[index].position.z = tempVector[index].position.z / tempVector[index].position.w;
 
-		// Step 3. Converting to NDC projective stage - Not used, since it is the part of the Matrix above
-		// tempVector[index].position.x = tempVector[index].position.x / (m_Camera.aspectRatio * m_Camera.fov);
-		// tempVector[index].position.y = tempVector[index].position.y / m_Camera.fov;
-
 		// Step for additional info calculations
 		tempVector[index].normal = worldMatrix.TransformVector(vertices_in[index].normal);
 		tempVector[index].tangent = worldMatrix.TransformVector(vertices_in[index].tangent);
 	}
 
-	// Step 4. Converting to Raster Space (Screen Space)
+	// Step 3. Converting to Raster Space (Screen Space)
 	for (size_t index{0}; index < tempVector.size(); ++index)
 	{
 		tempVector[index].position.x = (tempVector[index].position.x + 1) / 2.0f * m_Width;
@@ -355,45 +317,107 @@ void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_
 
 ColorRGB Renderer::PixelShading(const Vertex_Out& v)
 {
-	const Vector3 binormal = Vector3::Cross(v.normal, v.tangent);
-	const auto tangentToWorldMatrix = Matrix{ v.tangent, binormal, v.normal, Vector3::Zero };
-
-	const ColorRGB normalMapColour = m_NormalMap->Sample(v.uv);
-	const ColorRGB specularMapColour = m_SpecularMap->Sample(v.uv) * m_Shininess;
-	const float glossMapValue = m_GlossMap->Sample(v.uv).r;
+	Vector3 finalNormal;
 
 	// Sampling normal map
-	auto sampledNormal = Vector3{ normalMapColour.r, normalMapColour.g, normalMapColour.b };
+	if (m_NormalMapOn)
+	{
+		const Vector3 binormal = Vector3::Cross(v.normal, v.tangent);
+		const auto tangentToWorldMatrix = Matrix{ v.tangent, binormal, v.normal, Vector3::Zero };
 
-	sampledNormal /= 255.0f;
-	sampledNormal = 2.0f * sampledNormal - Vector3{ 1.0f, 1.0f, 1.0f };
+		const ColorRGB normalMapColour = m_NormalMap->Sample(v.uv);
+		auto sampledNormal = Vector3{ normalMapColour.r, normalMapColour.g, normalMapColour.b };
 
-	sampledNormal = tangentToWorldMatrix.TransformVector(sampledNormal);
-	sampledNormal.Normalize();
+		sampledNormal /= 255.0f;
+		sampledNormal = 2.0f * sampledNormal - Vector3{ 1.0f, 1.0f, 1.0f };
 
-	// Calculating observed Area
-	const Vector3 lightDirection{ 0.577f, -0.577f, 0.577f };
-	const float observedArea{ std::max(Vector3::Dot(sampledNormal, -lightDirection), 0.0f) };
+		sampledNormal = tangentToWorldMatrix.TransformVector(sampledNormal);
+		sampledNormal.Normalize();
 
-	// Calculating the colour
-	const float kd{ 7.0f };
-	const ColorRGB lambertBRDF{ (kd * v.color) / M_PI };
+		finalNormal = sampledNormal;
+	}
+	else
+	{
+		finalNormal = v.normal;
+	}
 
-	// Calculating phong
-	auto reflect = Vector3::Reflect(-lightDirection, sampledNormal);
-	auto cosa = abs(Vector3::Dot(reflect, v.viewDirection));
+	ColorRGB finalColour;
 
-	const float phong = 0.5f * powf(cosa, glossMapValue);
+	const ColorRGB specularMapColour = m_SpecularMap->Sample(v.uv) * m_Shininess;
 
-	const ColorRGB specColour = phong * specularMapColour;
+	switch (m_ShadingMode)
+	{
+	case ShadingMode::ObservedArea:
+		m_LightDirection = { 0.577f, -0.577f, 0.577f };
+		m_ObservedArea = { std::max(Vector3::Dot(finalNormal, -m_LightDirection), 0.0f) };
+		finalColour = ColorRGB{ m_ObservedArea, m_ObservedArea, m_ObservedArea };
+		break;
+	case ShadingMode::Diffuse:
+		//const ColorRGB lambertDiffuse{ (m_Kd * v.color) / M_PI };
+		finalColour = (m_Kd * v.color) / M_PI / 255.0f;
+		break;
+	case ShadingMode::Specular:
+		finalColour = specularMapColour / 255.0f;
+		break;
+	case ShadingMode::Combined:
+		m_LightDirection = { 0.577f, -0.577f, 0.577f };
+		m_ObservedArea = { std::max(Vector3::Dot(finalNormal, -m_LightDirection), 0.0f) };
 
-	const ColorRGB outColor{ (lambertBRDF * observedArea + specColour) / 255.0f };
-	return outColor;
+		const ColorRGB lambertDiffuse{ (m_Kd * v.color) / M_PI };
+
+		auto reflect = Vector3::Reflect(-m_LightDirection, finalNormal);
+		auto cosa = abs(Vector3::Dot(reflect, v.viewDirection));
+
+		const float glossMapValue = m_GlossMap->Sample(v.uv).r;
+		const float phong = m_Ks * powf(cosa, glossMapValue);
+
+		const ColorRGB outColor{ (lambertDiffuse * m_ObservedArea + phong * specularMapColour) / 255.0f };
+		finalColour = outColor;
+		break;
+	}
+
+	return finalColour;
 }
 
 bool Renderer::SaveBufferToImage() const
 {
 	return SDL_SaveBMP(m_pBackBuffer, "Rasterizer_ColorBuffer.bmp");
 }
+
+void Renderer::ToggleRotation()
+{
+	m_RotationOn = !m_RotationOn;
+}
+
+void Renderer::ToggleNormals()
+{
+	m_NormalMapOn = !m_NormalMapOn;
+}
+
+void Renderer::ToggleDepthBuffer()
+{
+	m_DepthBufferView = !m_DepthBufferView;
+}
+
+void Renderer::ToggleShadowMode()
+{
+	switch (m_ShadingMode)
+	{
+	case ShadingMode::Combined:
+		m_ShadingMode = ShadingMode::ObservedArea;
+		break;
+	case ShadingMode::ObservedArea:
+		m_ShadingMode = ShadingMode::Diffuse;
+		break;
+	case ShadingMode::Diffuse:
+		m_ShadingMode = ShadingMode::Specular;
+		break;
+	case ShadingMode::Specular:
+		m_ShadingMode = ShadingMode::Combined;
+		break;
+	}
+}
+
+
 
 

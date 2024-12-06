@@ -74,17 +74,27 @@ int main(int argc, char* args[])
 				}
 				if (e.key.keysym.scancode == SDL_SCANCODE_F4)
 				{
-					if (pRenderer->ColorMode == Renderer::ColorMode::FinalColor)
-					{
-						pRenderer->ColorMode = Renderer::ColorMode::DepthBuffer;
-					}
-					else
-					{
-						pRenderer->ColorMode = Renderer::ColorMode::FinalColor;
-					}
+					pRenderer->ToggleDepthBuffer();
 					break;
 				}
-				break;
+
+				if (e.key.keysym.scancode == SDL_SCANCODE_F5)
+				{
+					pRenderer->ToggleRotation();
+					break;
+				}
+
+				if (e.key.keysym.scancode == SDL_SCANCODE_F6)
+				{
+					pRenderer->ToggleNormals();
+					break;
+				}
+
+				if (e.key.keysym.scancode == SDL_SCANCODE_F7)
+				{
+					pRenderer->ToggleShadowMode();
+					break;
+				}
 			}
 		}
 

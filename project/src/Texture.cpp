@@ -31,7 +31,6 @@ namespace dae
 		auto* pTexture = new Texture(pSurface);
 
 		return pTexture;
-
 	}
 
 	ColorRGB Texture::Sample(const Vector2& uv) const
@@ -49,6 +48,6 @@ namespace dae
 
 		SDL_GetRGB(pixel, m_pSurface->format, &r, &g, &b);
 
-		return ColorRGB{ r / 1.0f, g / 1.0f, b / 1.0f };
+		return ColorRGB{ r * 1.0f, g * 1.0f, b * 1.0f };
 	}
 }

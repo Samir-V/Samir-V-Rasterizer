@@ -43,16 +43,20 @@ namespace dae
 		void VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex_Out>& vertices_out) const;
 		ColorRGB PixelShading(const Vertex_Out& v);
 		float Remap(float depthValue, float min, float max);
+		void ToggleRotation();
+		void ToggleNormals();
+		void ToggleDepthBuffer();
+		void ToggleShadowMode();
 
-		enum class ColorMode
+		enum class ShadingMode
 		{
-			FinalColor,
-			DepthBuffer
+			ObservedArea,
+			Diffuse,
+			Specular,
+			Combined
 		};
 
 		float yaw{};
-
-		ColorMode ColorMode = ColorMode::FinalColor;
 
 	private:
 		SDL_Window* m_pWindow{};
@@ -71,6 +75,10 @@ namespace dae
 		std::unique_ptr<Texture> m_GlossMap;
 
 		float m_Shininess{};
+		float m_Kd{};
+		float m_Ks{};
+		float m_ObservedArea{};
+		Vector3 m_LightDirection{};
 
 		std::vector<Mesh> m_WorldMeshes{
 			Mesh
@@ -78,32 +86,18 @@ namespace dae
 				{},
 				{},
 				PrimitiveTopology::TriangleList,
-				{}
+				{},
+				Matrix::CreateTranslation(0, 0, 50)
 			}
-
-			/*Mesh{
-					{
-				{{-3.0f, 3.0f, -2.0f}, colors::White, Vector2{0.0f, 0.0f}},
-				{{0.0f, 3.0f, -2.0f}, colors::White, Vector2{0.5f, 0.0f}},
-				{{3.0f, 3.0f, -2.0f}, colors::White, Vector2{1.0f, 0.0f}},
-				{{-3.0f, 0.0f, -2.0f}, colors::White, Vector2{0.0f, 0.5f}},
-				{{0.0f, 0.0f, -2.0f}, colors::White, Vector2{0.5f, 0.5f}},
-				{{3.0f, 0.0f, -2.0f}, colors::White, Vector2{1.0f, 0.5f}},
-				{{-3.0f, -3.0f, -2.0f}, colors::White, Vector2{0.0f, 1.0f}},
-				{{0.0f, -3.0f, -2.0f}, colors::White, Vector2{0.5f, 1.0f}},
-				{{3.0f, -3.0f, -2.0f}, colors::White, Vector2{1.0f, 1.0f}},
-				},
-					{
-						3, 0, 4, 1, 5, 2,
-						2, 6,
-						6, 3, 7, 4, 8, 5
-					},
-
-					PrimitiveTopology::TriangleStrip
-				}*/
 		};
 
 		int m_Width{};
 		int m_Height{};
+
+		bool m_RotationOn{ true };
+		bool m_NormalMapOn{ true };
+		bool m_DepthBufferView{ false };
+
+		ShadingMode m_ShadingMode = ShadingMode::Combined;
 	};
 }
