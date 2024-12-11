@@ -42,8 +42,7 @@ namespace dae
 
 		void VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex_Out>& vertices_out) const;
 		ColorRGB PixelShading(const Vertex_Out& v);
-		float Remap(float depthValue, float min, float max);
-		float Remap01(float value, float start, float stop);
+		static float Remap(float depthValue, float min, float max);
 
 		void ToggleRotation();
 		void ToggleNormals();
@@ -89,7 +88,6 @@ namespace dae
 				{},
 				PrimitiveTopology::TriangleList,
 				{},
-				Matrix::CreateTranslation(0, -5, 64)
 			}
 		};
 
