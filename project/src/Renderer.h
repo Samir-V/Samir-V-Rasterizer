@@ -43,6 +43,8 @@ namespace dae
 		void VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex_Out>& vertices_out) const;
 		ColorRGB PixelShading(const Vertex_Out& v);
 		float Remap(float depthValue, float min, float max);
+		float Remap01(float value, float start, float stop);
+
 		void ToggleRotation();
 		void ToggleNormals();
 		void ToggleDepthBuffer();
@@ -87,7 +89,7 @@ namespace dae
 				{},
 				PrimitiveTopology::TriangleList,
 				{},
-				Matrix::CreateTranslation(0, 0, 50)
+				Matrix::CreateTranslation(0, -5, 64)
 			}
 		};
 
@@ -99,5 +101,7 @@ namespace dae
 		bool m_DepthBufferView{ false };
 
 		ShadingMode m_ShadingMode = ShadingMode::Combined;
+
+		std::vector<Vertex_Out> m_TempVector{};
 	};
 }

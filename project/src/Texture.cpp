@@ -19,7 +19,7 @@ namespace dae
 		}
 	}
 
-	Texture* Texture::LoadFromFile(const std::string& path)
+	std::unique_ptr<Texture> Texture::LoadFromFile(const std::string& path)
 	{
 		SDL_Surface* pSurface = IMG_Load(path.c_str());
 
@@ -28,17 +28,15 @@ namespace dae
 			return nullptr;
 		}
 
-		auto* pTexture = new Texture(pSurface);
-
-		return pTexture;
+		return std::unique_ptr<Texture>(new Texture(pSurface));
 	}
 
 	ColorRGB Texture::Sample(const Vector2& uv) const
 	{
-		auto convertedWidth = int(uv.x * m_pSurface->w);
-		auto convertedHeight = int(uv.y * m_pSurface->h);
+		int convertedWidth = int(uv.x * m_pSurface->w);
+		int convertedHeight = int(uv.y * m_pSurface->h);
 
-		auto indexOfPixel = convertedHeight * m_pSurface->w + convertedWidth;
+		int indexOfPixel = convertedHeight * m_pSurface->w + convertedWidth;
 
 		Uint32 pixel = ((Uint32*)m_pSurface->pixels)[indexOfPixel];
 
@@ -48,6 +46,6 @@ namespace dae
 
 		SDL_GetRGB(pixel, m_pSurface->format, &r, &g, &b);
 
-		return ColorRGB{ r * 1.0f, g * 1.0f, b * 1.0f };
+		return ColorRGB{ r / 255.0f, g / 255.0f, b / 255.0f };
 	}
 }

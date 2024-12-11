@@ -33,5 +33,6 @@ namespace dae
 		float& operator[](int index);
 		float operator[](int index) const;
 		bool operator==(const Vector4& v) const;
+		Vector4 operator/(float scale) const;
 	};
 }

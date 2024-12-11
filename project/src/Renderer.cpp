@@ -29,10 +29,10 @@ Renderer::Renderer(SDL_Window* pWindow) :
 
 	std::fill_n(m_pDepthBufferPixels, m_Width * m_Height, FLT_MAX);
 
-	m_Texture = std::make_unique<Texture>(*Texture::LoadFromFile("resources/vehicle_diffuse.png"));
-	m_NormalMap = std::make_unique<Texture>(*Texture::LoadFromFile("resources/vehicle_normal.png"));
-	m_SpecularMap = std::make_unique<Texture>(*Texture::LoadFromFile("resources/vehicle_specular.png"));
-	m_GlossMap = std::make_unique<Texture>(*Texture::LoadFromFile("resources/vehicle_gloss.png"));
+	m_Texture = Texture::LoadFromFile("resources/vehicle_diffuse.png");
+	m_NormalMap = Texture::LoadFromFile("resources/vehicle_normal.png");
+	m_SpecularMap = Texture::LoadFromFile("resources/vehicle_specular.png");
+	m_GlossMap = Texture::LoadFromFile("resources/vehicle_gloss.png");
 
 	m_Shininess = 25.0f;
 	m_Kd = 7.0f;
@@ -164,11 +164,11 @@ void Renderer::Render()
 			return;
 		}
 
-		auto stepMinX = std::min(firstVertex.position.x, secondVertex.position.x);
-		auto stepMinY = std::min(firstVertex.position.y, secondVertex.position.y);
+		float stepMinX = std::min(firstVertex.position.x, secondVertex.position.x);
+		float stepMinY = std::min(firstVertex.position.y, secondVertex.position.y);
 
-		auto stepMaxX = std::max(firstVertex.position.x, secondVertex.position.x);
-		auto stepMaxY = std::max(firstVertex.position.y, secondVertex.position.y);
+		float stepMaxX = std::max(firstVertex.position.x, secondVertex.position.x);
+		float stepMaxY = std::max(firstVertex.position.y, secondVertex.position.y);
 
 		// Bounding box coordinates
 		Vector2 topLeft
@@ -197,36 +197,36 @@ void Renderer::Render()
 			{
 				Vector2 currentPixel{ px + 0.5f, py + 0.5f };
 
-				auto eVector = V1 - V0;
-				auto pVector = currentPixel - V0;
+				Vector2 eVector = V1 - V0;
+				Vector2 pVector = currentPixel - V0;
 
-				auto cross1 = Vector2::Cross(eVector, pVector);
+				float cross1 = Vector2::Cross(eVector, pVector);
 
 				if (cross1 < 0.0f) continue;
 
 				eVector = V2 - V1;
 				pVector = currentPixel - V1;
 
-				auto cross2 = Vector2::Cross(eVector, pVector);
+				float cross2 = Vector2::Cross(eVector, pVector);
 
 				if (cross2 < 0.0f) continue;
 
 				eVector = V0 - V2;
 				pVector = currentPixel - V2;
 
-				auto cross3 = Vector2::Cross(eVector, pVector);
+				float cross3 = Vector2::Cross(eVector, pVector);
 
 				if (cross3 < 0.0f) continue;
 
 				// Calculating weights
-				auto totalArea = Vector2::Cross(V1 - V0, V2 - V0);
+				float totalArea = Vector2::Cross(V1 - V0, V2 - V0);
 
-				auto weightV0 = cross2 / totalArea;
-				auto weightV1 = cross3 / totalArea;
-				auto weightV2 = cross1 / totalArea;
+				float weightV0 = cross2 / totalArea;
+				float weightV1 = cross3 / totalArea;
+				float weightV2 = 1 - weightV0 - weightV1;
 
 				// Calculating the interpolated depth
-				auto zBuffer = 1 / (1 / firstVertex.position.z * weightV0 + 1 / secondVertex.position.z * weightV1 + 1 / thirdVertex.position.z * weightV2);
+				float zBuffer = 1 / (1 / firstVertex.position.z * weightV0 + 1 / secondVertex.position.z * weightV1 + 1 / thirdVertex.position.z * weightV2);
 
 				if (zBuffer < 0) continue;
 				if (zBuffer > 1) continue;
@@ -235,20 +235,18 @@ void Renderer::Render()
 				{
 					m_pDepthBufferPixels[px + (py * m_Width)] = zBuffer;
 
-					auto interWDepth = 1 / (1 / firstVertex.position.w * weightV0 + 1 / secondVertex.position.w * weightV1 + 1 / thirdVertex.position.w * weightV2);
+					float interWDepth = 1 / (1 / firstVertex.position.w * weightV0 + 1 / secondVertex.position.w * weightV1 + 1 / thirdVertex.position.w * weightV2);
 
 					ColorRGB finalColour;
 
 					if (!m_DepthBufferView)
 					{
-						const auto interUV = (firstVertex.uv / firstVertex.position.w * weightV0 + secondVertex.uv / secondVertex.position.w * weightV1 + thirdVertex.uv / thirdVertex.position.w * weightV2) * interWDepth;
-						const auto sampledColour = m_Texture->Sample(interUV);
-						const auto normal = Vector3(firstVertex.normal * weightV0 + secondVertex.normal * weightV1 + thirdVertex.normal * weightV2);
-						const auto tangent = Vector3(firstVertex.tangent * weightV0 + secondVertex.tangent * weightV1 + thirdVertex.tangent * weightV2);
-						const Vector3 pos = firstVertex.position * weightV0 + secondVertex.position * weightV1 + thirdVertex.position * weightV2;
-						const auto viewDir = (pos - m_Camera.origin).Normalized();
+						const Vector2 interUV = (firstVertex.uv / firstVertex.position.w * weightV0 + secondVertex.uv / secondVertex.position.w * weightV1 + thirdVertex.uv / thirdVertex.position.w * weightV2) * interWDepth;
+						const Vector3 normal = Vector3(firstVertex.normal / firstVertex.position.w * weightV0 + secondVertex.normal / secondVertex.position.w * weightV1 + thirdVertex.normal / thirdVertex.position.w * weightV2) * interWDepth;
+						const Vector3 tangent = Vector3(firstVertex.tangent / firstVertex.position.w * weightV0 + secondVertex.tangent / secondVertex.position.w * weightV1 + thirdVertex.tangent / thirdVertex.position.w * weightV2) * interWDepth;
+						const Vector3 viewDir = (firstVertex.viewDirection / firstVertex.position.w * weightV0 + secondVertex.viewDirection / secondVertex.position.w * weightV1 + thirdVertex.viewDirection / thirdVertex.position.w * weightV2) * interWDepth;
 
-						const Vertex_Out pixelVertexData{ {}, sampledColour, interUV, normal, tangent, viewDir };
+						const Vertex_Out pixelVertexData{ {}, {}, interUV, normal, tangent, viewDir };
 
 						finalColour = PixelShading(pixelVertexData);
 					}
@@ -282,9 +280,10 @@ void Renderer::Render()
 
 void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex_Out>& vertices_out) const
 {
-	std::vector<Vertex_Out> tempVector{};
+	vertices_out.clear();
 
-	tempVector.reserve(vertices_in.size());
+	vertices_out.reserve(vertices_in.size());
+
 
 	const Matrix worldMatrix = m_WorldMeshes[0].worldMatrix;
 	const Matrix megaMatrix = worldMatrix * m_Camera.viewMatrix * Matrix::CreatePerspectiveFovLH(m_Camera.fov, m_Camera.aspectRatio, m_Camera.near, m_Camera.far);
@@ -293,26 +292,25 @@ void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_
 	{
 		// Step 1. From world to Camera space + Step 3. Projection
 		Vector4 transformedPoint = megaMatrix.TransformPoint(vertices_in[index].position.ToVector4());
-		tempVector.emplace_back(transformedPoint, vertices_in[index].color, vertices_in[index].uv);
+		vertices_out.emplace_back(transformedPoint, vertices_in[index].color, vertices_in[index].uv);
 
 		// Step 2. Perspective divide
-		tempVector[index].position.x = tempVector[index].position.x / tempVector[index].position.w;
-		tempVector[index].position.y = tempVector[index].position.y / tempVector[index].position.w;
-		tempVector[index].position.z = tempVector[index].position.z / tempVector[index].position.w;
+		vertices_out[index].position.x = vertices_out[index].position.x / vertices_out[index].position.w;
+		vertices_out[index].position.y = vertices_out[index].position.y / vertices_out[index].position.w;
+		vertices_out[index].position.z = vertices_out[index].position.z / vertices_out[index].position.w;
 
 		// Step for additional info calculations
-		tempVector[index].normal = worldMatrix.TransformVector(vertices_in[index].normal);
-		tempVector[index].tangent = worldMatrix.TransformVector(vertices_in[index].tangent);
+		vertices_out[index].normal = worldMatrix.TransformVector(vertices_in[index].normal);
+		vertices_out[index].tangent = worldMatrix.TransformVector(vertices_in[index].tangent);
+		vertices_out[index].viewDirection = (m_Camera.origin - worldMatrix.TransformPoint(vertices_in[index].position)).Normalized();
 	}
 
 	// Step 3. Converting to Raster Space (Screen Space)
-	for (size_t index{0}; index < tempVector.size(); ++index)
+	for (size_t index{0}; index < vertices_out.size(); ++index)
 	{
-		tempVector[index].position.x = (tempVector[index].position.x + 1) / 2.0f * m_Width;
-		tempVector[index].position.y = (1 - tempVector[index].position.y) / 2.0f * m_Height;
+		vertices_out[index].position.x = (vertices_out[index].position.x + 1) / 2.0f * m_Width;
+		vertices_out[index].position.y = (1 - vertices_out[index].position.y) / 2.0f * m_Height;
 	}
-		
-	vertices_out = std::move(tempVector);
 }
 
 ColorRGB Renderer::PixelShading(const Vertex_Out& v)
@@ -323,58 +321,58 @@ ColorRGB Renderer::PixelShading(const Vertex_Out& v)
 	if (m_NormalMapOn)
 	{
 		const Vector3 binormal = Vector3::Cross(v.normal, v.tangent);
-		const auto tangentToWorldMatrix = Matrix{ v.tangent, binormal, v.normal, Vector3::Zero };
+		const Matrix tangentToWorldMatrix = Matrix{ v.tangent, binormal, v.normal, Vector3::Zero };
 
 		const ColorRGB normalMapColour = m_NormalMap->Sample(v.uv);
-		auto sampledNormal = Vector3{ normalMapColour.r, normalMapColour.g, normalMapColour.b };
+		Vector3 sampledNormal = Vector3{ normalMapColour.r, normalMapColour.g, normalMapColour.b };
 
-		sampledNormal /= 255.0f;
+		
 		sampledNormal = 2.0f * sampledNormal - Vector3{ 1.0f, 1.0f, 1.0f };
 
 		sampledNormal = tangentToWorldMatrix.TransformVector(sampledNormal);
-		sampledNormal.Normalize();
 
-		finalNormal = sampledNormal;
+		finalNormal = sampledNormal.Normalized();
 	}
 	else
 	{
-		finalNormal = v.normal;
+		finalNormal = v.normal.Normalized();
 	}
 
 	ColorRGB finalColour;
 
-	const ColorRGB specularMapColour = m_SpecularMap->Sample(v.uv) * m_Shininess;
+	m_LightDirection = { 0.577f, -0.577f, 0.577f };
+
+	const Vector3 reflect = Vector3::Reflect(-m_LightDirection, finalNormal);
+	const float cosa = std::max(0.0f, Vector3::Dot(reflect, -v.viewDirection));
+
+	m_ObservedArea = { std::max(Vector3::Dot(finalNormal, -m_LightDirection), 0.0f) };
+
+	const ColorRGB specularMapColour = m_SpecularMap->Sample(v.uv);
+	const float glossMapValue = m_GlossMap->Sample(v.uv).r;
+
+	const float phong = m_Ks * std::pow(cosa, glossMapValue * m_Shininess);
+
+	const ColorRGB lambertDiffuse{ (m_Kd * m_Texture->Sample(v.uv)) / M_PI };
+
+	ColorRGB ambient = { .025f,.025f,.025f };
 
 	switch (m_ShadingMode)
 	{
 	case ShadingMode::ObservedArea:
-		m_LightDirection = { 0.577f, -0.577f, 0.577f };
-		m_ObservedArea = { std::max(Vector3::Dot(finalNormal, -m_LightDirection), 0.0f) };
 		finalColour = ColorRGB{ m_ObservedArea, m_ObservedArea, m_ObservedArea };
 		break;
 	case ShadingMode::Diffuse:
-		//const ColorRGB lambertDiffuse{ (m_Kd * v.color) / M_PI };
-		finalColour = (m_Kd * v.color) / M_PI / 255.0f;
+		finalColour = lambertDiffuse * m_ObservedArea;
 		break;
 	case ShadingMode::Specular:
-		finalColour = specularMapColour / 255.0f;
+		finalColour = ColorRGB{phong, phong, phong};
 		break;
 	case ShadingMode::Combined:
-		m_LightDirection = { 0.577f, -0.577f, 0.577f };
-		m_ObservedArea = { std::max(Vector3::Dot(finalNormal, -m_LightDirection), 0.0f) };
-
-		const ColorRGB lambertDiffuse{ (m_Kd * v.color) / M_PI };
-
-		auto reflect = Vector3::Reflect(-m_LightDirection, finalNormal);
-		auto cosa = abs(Vector3::Dot(reflect, v.viewDirection));
-
-		const float glossMapValue = m_GlossMap->Sample(v.uv).r;
-		const float phong = m_Ks * powf(cosa, glossMapValue);
-
-		const ColorRGB outColor{ (lambertDiffuse * m_ObservedArea + phong * specularMapColour) / 255.0f };
-		finalColour = outColor;
+		finalColour = (lambertDiffuse * m_ObservedArea + specularMapColour * phong + ambient );
 		break;
 	}
+
+	//finalColour = {Remap01(finalNormal.x, -1,1),  Remap01(finalNormal.y, -1, 1), Remap01(finalNormal.z,-1,1) };
 
 	return finalColour;
 }
@@ -416,6 +414,11 @@ void Renderer::ToggleShadowMode()
 		m_ShadingMode = ShadingMode::Combined;
 		break;
 	}
+}
+
+float Renderer::Remap01(float value, float start, float stop)
+{
+	return (value - start) / (stop - start);
 }
 
 

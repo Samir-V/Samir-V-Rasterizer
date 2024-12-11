@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #include <SDL_surface.h>
 #include <string>
 #include "ColorRGB.h"
@@ -12,7 +13,7 @@ namespace dae
 	public:
 		~Texture();
 
-		static Texture* LoadFromFile(const std::string& path);
+		static std::unique_ptr<Texture> LoadFromFile(const std::string& path);
 		ColorRGB Sample(const Vector2& uv) const;
 
 	private:

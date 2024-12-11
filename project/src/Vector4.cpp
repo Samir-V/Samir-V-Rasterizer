@@ -105,5 +105,11 @@ namespace dae
 		return AreEqual(x, v.x, .000001f) && AreEqual(y, v.y, .000001f) && AreEqual(z, v.z, .000001f) && AreEqual(w, v.w, .000001f);
 	}
 
+	Vector4 Vector4::operator/(float scale) const
+	{
+		return {x / scale, y / scale, z / scale, w / scale};
+	}
+
+
 #pragma endregion
 }
