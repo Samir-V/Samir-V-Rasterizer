@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include <algorithm>
+#include <execution>
 
 #include "Maths.h"
 #include "Texture.h"
@@ -83,7 +84,6 @@ void Renderer::Render()
 	for (size_t index{ 0 }; index < m_WorldMeshes.size(); ++index)
 	{
 		m_WorldMeshes[index].vertices_out.reserve(m_WorldMeshes[index].vertices.size());
-
 		VertexTransformationFunction(m_WorldMeshes[index].vertices, m_WorldMeshes[index].vertices_out);
 
 		Vertex_Out firstVertex;
@@ -150,119 +150,7 @@ void Renderer::Render()
 				continue;
 			}
 
-			Vector2 V0{ firstVertex.position.x, firstVertex.position.y };
-			Vector2 V1{ secondVertex.position.x, secondVertex.position.y };
-			Vector2 V2{ thirdVertex.position.x, thirdVertex.position.y };
-
-			if (V0 == V1 || V1 == V2 || V2 == V0)
-			{
-				continue;
-			}
-
-			float stepMinX = std::min(firstVertex.position.x, secondVertex.position.x);
-			float stepMinY = std::min(firstVertex.position.y, secondVertex.position.y);
-
-			float stepMaxX = std::max(firstVertex.position.x, secondVertex.position.x);
-			float stepMaxY = std::max(firstVertex.position.y, secondVertex.position.y);
-
-			// Bounding box coordinates
-			Vector2 topLeft
-			{
-				std::min(stepMinX, thirdVertex.position.x),
-				std::min(stepMinY, thirdVertex.position.y)
-			};
-
-			Vector2 botRight
-			{
-				std::ceil(std::max(stepMaxX, thirdVertex.position.x)),
-				std::ceil(std::max(stepMaxY, thirdVertex.position.y))
-			};
-
-			// Does not exceed screen (Pixels are not floats)
-			topLeft.x = int(std::max(0.0f, std::min(topLeft.x, static_cast<float>(m_Width - 1))));
-			topLeft.y = int(std::max(0.0f, std::min(topLeft.y, static_cast<float>(m_Height - 1))));
-
-			botRight.x = int(std::max(0.0f, std::min(botRight.x, static_cast<float>(m_Width - 1))));
-			botRight.y = int(std::max(0.0f, std::min(botRight.y, static_cast<float>(m_Height - 1))));
-
-			//RENDER LOGIC
-			for (int px{ int(topLeft.x) }; px < int(botRight.x); ++px)
-			{
-				for (int py{ int(topLeft.y) }; py < int(botRight.y); ++py)
-				{
-					Vector2 currentPixel{ px + 0.5f, py + 0.5f };
-
-					Vector2 eVector = V1 - V0;
-					Vector2 pVector = currentPixel - V0;
-
-					float cross1 = Vector2::Cross(eVector, pVector);
-
-					if (cross1 < 0.0f) continue;
-
-					eVector = V2 - V1;
-					pVector = currentPixel - V1;
-
-					float cross2 = Vector2::Cross(eVector, pVector);
-
-					if (cross2 < 0.0f) continue;
-
-					eVector = V0 - V2;
-					pVector = currentPixel - V2;
-
-					float cross3 = Vector2::Cross(eVector, pVector);
-
-					if (cross3 < 0.0f) continue;
-
-					// Calculating weights
-					float totalArea = Vector2::Cross(V1 - V0, V2 - V0);
-
-					float weightV0 = cross2 / totalArea;
-					float weightV1 = cross3 / totalArea;
-					float weightV2 = 1 - weightV0 - weightV1;
-
-					// Calculating the interpolated depth
-					float zBuffer = 1 / (1 / firstVertex.position.z * weightV0 + 1 / secondVertex.position.z * weightV1 + 1 / thirdVertex.position.z * weightV2);
-
-					if (zBuffer < 0) continue;
-					if (zBuffer > 1) continue;
-
-					if (zBuffer < m_pDepthBufferPixels[px + (py * m_Width)])
-					{
-						m_pDepthBufferPixels[px + (py * m_Width)] = zBuffer;
-
-						float interWDepth = 1 / (1 / firstVertex.position.w * weightV0 + 1 / secondVertex.position.w * weightV1 + 1 / thirdVertex.position.w * weightV2);
-
-						ColorRGB finalColour;
-
-						if (!m_DepthBufferView)
-						{
-							const Vector2 interUV = (firstVertex.uv / firstVertex.position.w * weightV0 + secondVertex.uv / secondVertex.position.w * weightV1 + thirdVertex.uv / thirdVertex.position.w * weightV2) * interWDepth;
-							const Vector3 normal = Vector3(firstVertex.normal / firstVertex.position.w * weightV0 + secondVertex.normal / secondVertex.position.w * weightV1 + thirdVertex.normal / thirdVertex.position.w * weightV2) * interWDepth;
-							const Vector3 tangent = Vector3(firstVertex.tangent / firstVertex.position.w * weightV0 + secondVertex.tangent / secondVertex.position.w * weightV1 + thirdVertex.tangent / thirdVertex.position.w * weightV2) * interWDepth;
-							const Vector3 viewDir = (firstVertex.viewDirection / firstVertex.position.w * weightV0 + secondVertex.viewDirection / secondVertex.position.w * weightV1 + thirdVertex.viewDirection / thirdVertex.position.w * weightV2) * interWDepth;
-
-							const Vertex_Out pixelVertexData{ {}, {}, interUV, normal, tangent, viewDir };
-
-							finalColour = PixelShading(pixelVertexData);
-						}
-						else if (m_DepthBufferView)
-						{
-							float depthValue = Remap(zBuffer, 0.995f, 1.0f);
-							float colorValue = (depthValue - 0.995f) / (1.0f - 0.995f);
-
-							finalColour = ColorRGB{ colorValue, colorValue, colorValue };
-						}
-
-						//Update Color in Buffer
-						finalColour.MaxToOne();
-
-						m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
-							static_cast<uint8_t>(finalColour.r * 255),
-							static_cast<uint8_t>(finalColour.g * 255),
-							static_cast<uint8_t>(finalColour.b * 255));
-					}
-				}
-			}
+			RenderTriangle(firstVertex, secondVertex, thirdVertex);
 		}
 	}
 
@@ -359,6 +247,129 @@ ColorRGB Renderer::PixelShading(const Vertex_Out& v)
 
 	return finalColour;
 }
+
+
+void Renderer::RenderTriangle(const Vertex_Out& firstVertex, const Vertex_Out& secondVertex, const Vertex_Out& thirdVertex)
+{
+	// Calculating the bounds
+
+	Vector2 V0{ firstVertex.position.x, firstVertex.position.y };
+	Vector2 V1{ secondVertex.position.x, secondVertex.position.y };
+	Vector2 V2{ thirdVertex.position.x, thirdVertex.position.y };
+
+	if (V0 == V1 || V1 == V2 || V2 == V0)
+	{
+		return;;
+	}
+
+	float stepMinX = std::min(firstVertex.position.x, secondVertex.position.x);
+	float stepMinY = std::min(firstVertex.position.y, secondVertex.position.y);
+
+	float stepMaxX = std::max(firstVertex.position.x, secondVertex.position.x);
+	float stepMaxY = std::max(firstVertex.position.y, secondVertex.position.y);
+
+	// Bounding box coordinates
+	Vector2 topLeft
+	{
+		std::min(stepMinX, thirdVertex.position.x),
+		std::min(stepMinY, thirdVertex.position.y)
+	};
+
+	Vector2 botRight
+	{
+		std::ceil(std::max(stepMaxX, thirdVertex.position.x)),
+		std::ceil(std::max(stepMaxY, thirdVertex.position.y))
+	};
+
+	// Does not exceed screen (Pixels are not floats)
+	topLeft.x = int(std::max(0.0f, std::min(topLeft.x, static_cast<float>(m_Width - 1))));
+	topLeft.y = int(std::max(0.0f, std::min(topLeft.y, static_cast<float>(m_Height - 1))));
+
+	botRight.x = int(std::max(0.0f, std::min(botRight.x, static_cast<float>(m_Width - 1))));
+	botRight.y = int(std::max(0.0f, std::min(botRight.y, static_cast<float>(m_Height - 1))));
+
+
+	// Actual render of the triangle
+
+	for (int px{ int(topLeft.x) }; px < int(botRight.x); ++px)
+	{
+		for (int py{ int(topLeft.y) }; py < int(botRight.y); ++py)
+		{
+			Vector2 currentPixel{ px + 0.5f, py + 0.5f };
+
+			Vector2 eVector = V1 - V0;
+			Vector2 pVector = currentPixel - V0;
+
+			float cross1 = Vector2::Cross(eVector, pVector);
+
+			if (cross1 < 0.0f) continue;
+
+			eVector = V2 - V1;
+			pVector = currentPixel - V1;
+
+			float cross2 = Vector2::Cross(eVector, pVector);
+
+			if (cross2 < 0.0f) continue;
+
+			eVector = V0 - V2;
+			pVector = currentPixel - V2;
+
+			float cross3 = Vector2::Cross(eVector, pVector);
+
+			if (cross3 < 0.0f) continue;
+
+			// Calculating weights
+			float totalArea = Vector2::Cross(V1 - V0, V2 - V0);
+
+			float weightV0 = cross2 / totalArea;
+			float weightV1 = cross3 / totalArea;
+			float weightV2 = 1 - weightV0 - weightV1;
+
+			// Calculating the interpolated depth
+			float zBuffer = 1 / (1 / firstVertex.position.z * weightV0 + 1 / secondVertex.position.z * weightV1 + 1 / thirdVertex.position.z * weightV2);
+
+			if (zBuffer < 0) continue;
+			if (zBuffer > 1) continue;
+
+			if (zBuffer < m_pDepthBufferPixels[px + (py * m_Width)])
+			{
+				m_pDepthBufferPixels[px + (py * m_Width)] = zBuffer;
+
+				float interWDepth = 1 / (1 / firstVertex.position.w * weightV0 + 1 / secondVertex.position.w * weightV1 + 1 / thirdVertex.position.w * weightV2);
+
+				ColorRGB finalColour;
+
+				if (!m_DepthBufferView)
+				{
+					const Vector2 interUV = (firstVertex.uv / firstVertex.position.w * weightV0 + secondVertex.uv / secondVertex.position.w * weightV1 + thirdVertex.uv / thirdVertex.position.w * weightV2) * interWDepth;
+					const Vector3 normal = Vector3(firstVertex.normal / firstVertex.position.w * weightV0 + secondVertex.normal / secondVertex.position.w * weightV1 + thirdVertex.normal / thirdVertex.position.w * weightV2) * interWDepth;
+					const Vector3 tangent = Vector3(firstVertex.tangent / firstVertex.position.w * weightV0 + secondVertex.tangent / secondVertex.position.w * weightV1 + thirdVertex.tangent / thirdVertex.position.w * weightV2) * interWDepth;
+					const Vector3 viewDir = (firstVertex.viewDirection / firstVertex.position.w * weightV0 + secondVertex.viewDirection / secondVertex.position.w * weightV1 + thirdVertex.viewDirection / thirdVertex.position.w * weightV2) * interWDepth;
+
+					const Vertex_Out pixelVertexData{ {}, {}, interUV, normal, tangent, viewDir };
+
+					finalColour = PixelShading(pixelVertexData);
+				}
+				else if (m_DepthBufferView)
+				{
+					float depthValue = Remap(zBuffer, 0.995f, 1.0f);
+					float colorValue = (depthValue - 0.995f) / (1.0f - 0.995f);
+
+					finalColour = ColorRGB{ colorValue, colorValue, colorValue };
+				}
+
+				//Update Color in Buffer
+				finalColour.MaxToOne();
+
+				m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
+					static_cast<uint8_t>(finalColour.r * 255),
+					static_cast<uint8_t>(finalColour.g * 255),
+					static_cast<uint8_t>(finalColour.b * 255));
+			}
+		}
+	}
+}
+
 
 bool Renderer::SaveBufferToImage() const
 {

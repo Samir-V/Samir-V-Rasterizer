@@ -43,6 +43,8 @@ namespace dae
 		void VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex_Out>& vertices_out) const;
 		ColorRGB PixelShading(const Vertex_Out& v);
 		static float Remap(float depthValue, float min, float max);
+		void RenderTriangle(const Vertex_Out& firstVertex, const Vertex_Out& secondVertex, const Vertex_Out& thirdVertex);
+		void ProcessMesh(Mesh& mesh);
 
 		void ToggleRotation();
 		void ToggleNormals();
@@ -100,6 +102,6 @@ namespace dae
 
 		ShadingMode m_ShadingMode = ShadingMode::Combined;
 
-		std::vector<Vertex_Out> m_TempVector{};
+		//std::vector<Triangle> m_TrianglesToRender{};
 	};
 }
