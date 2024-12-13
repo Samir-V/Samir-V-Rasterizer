@@ -44,7 +44,6 @@ namespace dae
 		ColorRGB PixelShading(const Vertex_Out& v);
 		static float Remap(float depthValue, float min, float max);
 		void RenderTriangle(const Vertex_Out& firstVertex, const Vertex_Out& secondVertex, const Vertex_Out& thirdVertex);
-		void ProcessMesh(Mesh& mesh);
 
 		void ToggleRotation();
 		void ToggleNormals();
@@ -82,6 +81,7 @@ namespace dae
 		float m_Ks{};
 		float m_ObservedArea{};
 		Vector3 m_LightDirection{};
+		ColorRGB m_Ambience{};
 
 		std::vector<Mesh> m_WorldMeshes{
 			Mesh

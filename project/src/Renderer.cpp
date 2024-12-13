@@ -39,6 +39,7 @@ Renderer::Renderer(SDL_Window* pWindow) :
 	m_Kd = 7.0f;
 	m_Ks = 0.5f;
 	m_LightDirection = { 0.577f, -0.577f, 0.577f };
+	m_Ambience = { .025f,.025f,.025f };
 
 	Utils::ParseOBJ("resources/vehicle.obj", m_WorldMeshes[0].vertices, m_WorldMeshes[0].indices);
 
@@ -66,9 +67,8 @@ void Renderer::Update(Timer* pTimer)
 
 float Renderer::Remap(float depthValue, float min, float max)
 {
-	return min + depthValue * (max - min);
+	return (max + min) / (max - depthValue);
 }
-
 
 void Renderer::Render()
 {
@@ -217,17 +217,18 @@ ColorRGB Renderer::PixelShading(const Vertex_Out& v)
 
 	ColorRGB finalColour;
 
-	const Vector3 reflect = -m_LightDirection - (2.0f * Vector3::Dot(-m_LightDirection, finalNormal) * finalNormal);
-	const float cosa = std::max(0.0f, Vector3::Dot(reflect, -v.viewDirection));
-
 	m_ObservedArea = { std::max(Vector3::Dot(finalNormal, -m_LightDirection), 0.0f) };
 
+	// Sampling
 	const ColorRGB specularMapColour = m_SpecularMap->Sample(v.uv);
 	const float glossMapValue = m_GlossMap->Sample(v.uv).r;
-
-	const float phong = m_Ks * std::pow(cosa, glossMapValue * m_Shininess);
 	const ColorRGB lambertDiffuse{ (m_Kd * m_Texture->Sample(v.uv)) / M_PI };
-	const ColorRGB ambient = { .025f,.025f,.025f };
+
+	// Phong
+	const Vector3 reflect = -m_LightDirection - (2.0f * Vector3::Dot(-m_LightDirection, finalNormal) * finalNormal);
+	const float cosa = std::max(0.0f, Vector3::Dot(reflect, -v.viewDirection));
+	const float phong = m_Ks * std::pow(cosa, glossMapValue * m_Shininess);
+
 
 	switch (m_ShadingMode)
 	{
@@ -241,7 +242,7 @@ ColorRGB Renderer::PixelShading(const Vertex_Out& v)
 		finalColour = ColorRGB{phong, phong, phong};
 		break;
 	case ShadingMode::Combined:
-		finalColour = (lambertDiffuse * m_ObservedArea + specularMapColour * phong + ambient );
+		finalColour = (lambertDiffuse * m_ObservedArea + specularMapColour * phong + m_Ambience );
 		break;
 	}
 
@@ -253,20 +254,20 @@ void Renderer::RenderTriangle(const Vertex_Out& firstVertex, const Vertex_Out& s
 {
 	// Calculating the bounds
 
-	Vector2 V0{ firstVertex.position.x, firstVertex.position.y };
-	Vector2 V1{ secondVertex.position.x, secondVertex.position.y };
-	Vector2 V2{ thirdVertex.position.x, thirdVertex.position.y };
+	const Vector2 V0{ firstVertex.position.x, firstVertex.position.y };
+	const Vector2 V1{ secondVertex.position.x, secondVertex.position.y };
+	const Vector2 V2{ thirdVertex.position.x, thirdVertex.position.y };
 
 	if (V0 == V1 || V1 == V2 || V2 == V0)
 	{
-		return;;
+		return;
 	}
 
-	float stepMinX = std::min(firstVertex.position.x, secondVertex.position.x);
-	float stepMinY = std::min(firstVertex.position.y, secondVertex.position.y);
+	const float stepMinX = std::min(firstVertex.position.x, secondVertex.position.x);
+	const float stepMinY = std::min(firstVertex.position.y, secondVertex.position.y);
 
-	float stepMaxX = std::max(firstVertex.position.x, secondVertex.position.x);
-	float stepMaxY = std::max(firstVertex.position.y, secondVertex.position.y);
+	const float stepMaxX = std::max(firstVertex.position.x, secondVertex.position.x);
+	const float stepMaxY = std::max(firstVertex.position.y, secondVertex.position.y);
 
 	// Bounding box coordinates
 	Vector2 topLeft
@@ -282,11 +283,11 @@ void Renderer::RenderTriangle(const Vertex_Out& firstVertex, const Vertex_Out& s
 	};
 
 	// Does not exceed screen (Pixels are not floats)
-	topLeft.x = int(std::max(0.0f, std::min(topLeft.x, static_cast<float>(m_Width - 1))));
-	topLeft.y = int(std::max(0.0f, std::min(topLeft.y, static_cast<float>(m_Height - 1))));
+	topLeft.x = int(std::max(0.0f, std::min(topLeft.x, float(m_Width - 1))));
+	topLeft.y = int(std::max(0.0f, std::min(topLeft.y, float(m_Height - 1))));
 
-	botRight.x = int(std::max(0.0f, std::min(botRight.x, static_cast<float>(m_Width - 1))));
-	botRight.y = int(std::max(0.0f, std::min(botRight.y, static_cast<float>(m_Height - 1))));
+	botRight.x = int(std::max(0.0f, std::min(botRight.x, float(m_Width - 1))));
+	botRight.y = int(std::max(0.0f, std::min(botRight.y, float(m_Height - 1))));
 
 
 	// Actual render of the triangle
@@ -300,33 +301,33 @@ void Renderer::RenderTriangle(const Vertex_Out& firstVertex, const Vertex_Out& s
 			Vector2 eVector = V1 - V0;
 			Vector2 pVector = currentPixel - V0;
 
-			float cross1 = Vector2::Cross(eVector, pVector);
+			const float cross1 = Vector2::Cross(eVector, pVector);
 
 			if (cross1 < 0.0f) continue;
 
 			eVector = V2 - V1;
 			pVector = currentPixel - V1;
 
-			float cross2 = Vector2::Cross(eVector, pVector);
+			const float cross2 = Vector2::Cross(eVector, pVector);
 
 			if (cross2 < 0.0f) continue;
 
 			eVector = V0 - V2;
 			pVector = currentPixel - V2;
 
-			float cross3 = Vector2::Cross(eVector, pVector);
+			const float cross3 = Vector2::Cross(eVector, pVector);
 
 			if (cross3 < 0.0f) continue;
 
 			// Calculating weights
-			float totalArea = Vector2::Cross(V1 - V0, V2 - V0);
+			const float totalArea = Vector2::Cross(V1 - V0, V2 - V0);
 
-			float weightV0 = cross2 / totalArea;
-			float weightV1 = cross3 / totalArea;
-			float weightV2 = 1 - weightV0 - weightV1;
+			const float weightV0 = cross2 / totalArea;
+			const float weightV1 = cross3 / totalArea;
+			const float weightV2 = 1 - weightV0 - weightV1;
 
 			// Calculating the interpolated depth
-			float zBuffer = 1 / (1 / firstVertex.position.z * weightV0 + 1 / secondVertex.position.z * weightV1 + 1 / thirdVertex.position.z * weightV2);
+			const float zBuffer = 1 / (1 / firstVertex.position.z * weightV0 + 1 / secondVertex.position.z * weightV1 + 1 / thirdVertex.position.z * weightV2);
 
 			if (zBuffer < 0) continue;
 			if (zBuffer > 1) continue;
@@ -335,7 +336,7 @@ void Renderer::RenderTriangle(const Vertex_Out& firstVertex, const Vertex_Out& s
 			{
 				m_pDepthBufferPixels[px + (py * m_Width)] = zBuffer;
 
-				float interWDepth = 1 / (1 / firstVertex.position.w * weightV0 + 1 / secondVertex.position.w * weightV1 + 1 / thirdVertex.position.w * weightV2);
+				const float interWDepth = 1 / (1 / firstVertex.position.w * weightV0 + 1 / secondVertex.position.w * weightV1 + 1 / thirdVertex.position.w * weightV2);
 
 				ColorRGB finalColour;
 
@@ -350,10 +351,10 @@ void Renderer::RenderTriangle(const Vertex_Out& firstVertex, const Vertex_Out& s
 
 					finalColour = PixelShading(pixelVertexData);
 				}
-				else if (m_DepthBufferView)
+				else
 				{
-					float depthValue = Remap(zBuffer, 0.995f, 1.0f);
-					float colorValue = (depthValue - 0.995f) / (1.0f - 0.995f);
+					const float depthValue = Remap(zBuffer, 0.995f, 1.0f);
+					const float colorValue = (depthValue - 0.995f) / (1.0f - 0.995f);
 
 					finalColour = ColorRGB{ colorValue, colorValue, colorValue };
 				}
