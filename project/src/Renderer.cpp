@@ -67,7 +67,7 @@ void Renderer::Update(Timer* pTimer)
 
 float Renderer::Remap(float depthValue, float min, float max)
 {
-	return min + depthValue * (max - min);
+	return (std::max(depthValue, min) - min) / (max - min);
 }
 
 void Renderer::Render()
@@ -84,6 +84,7 @@ void Renderer::Render()
 	for (size_t index{ 0 }; index < m_WorldMeshes.size(); ++index)
 	{
 		m_WorldMeshes[index].vertices_out.reserve(m_WorldMeshes[index].vertices.size());
+
 		VertexTransformationFunction(m_WorldMeshes[index].vertices, m_WorldMeshes[index].vertices_out);
 
 		Vertex_Out firstVertex;
@@ -186,7 +187,7 @@ void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_
 		vertices_out[index].viewDirection = (m_Camera.origin - worldMatrix.TransformPoint(vertices_in[index].position)).Normalized();
 	}
 
-	// Step 3. Converting to Raster Space (Screen Space)
+	// Step 4. Converting to Raster Space (Screen Space)
 	for (size_t index{0}; index < vertices_out.size(); ++index)
 	{
 		vertices_out[index].position.x = (vertices_out[index].position.x + 1) * 0.5f * m_Width;
@@ -219,7 +220,7 @@ ColorRGB Renderer::PixelShading(const Vertex_Out& v)
 
 	m_ObservedArea = { std::max(Vector3::Dot(finalNormal, -m_LightDirection), 0.0f) };
 
-	// Sampling
+	// Sampling additional info
 	const ColorRGB specularMapColour = m_SpecularMap->Sample(v.uv);
 	const float glossMapValue = m_GlossMap->Sample(v.uv).r;
 	const ColorRGB lambertDiffuse{ (m_Kd * m_Texture->Sample(v.uv)) / M_PI };
@@ -353,8 +354,7 @@ void Renderer::RenderTriangle(const Vertex_Out& firstVertex, const Vertex_Out& s
 				}
 				else
 				{
-					const float depthValue = Remap(zBuffer, 0.995f, 1.0f);
-					const float colorValue = (depthValue - 0.995f) / (1.0f - 0.995f);
+					const float colorValue = Remap(zBuffer, 0.995f, 1.0f);
 
 					finalColour = ColorRGB{ colorValue, colorValue, colorValue };
 				}
