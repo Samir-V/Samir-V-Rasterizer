@@ -67,7 +67,7 @@ void Renderer::Update(Timer* pTimer)
 
 float Renderer::Remap(float depthValue, float min, float max)
 {
-	return (max + min) / (max - depthValue);
+	return min + depthValue * (max - min);
 }
 
 void Renderer::Render()

@@ -84,22 +84,22 @@ namespace dae
 			int mouseX{}, mouseY{};
 			const uint32_t mouseState = SDL_GetRelativeMouseState(&mouseX, &mouseY);
 
-			if (pKeyboardState[SDL_SCANCODE_W])
+			if (pKeyboardState[SDL_SCANCODE_W] || pKeyboardState[SDL_SCANCODE_UP])
 			{
 				origin += forward * movementSpeed * deltaTime;
 			}
 
-			if (pKeyboardState[SDL_SCANCODE_S])
+			if (pKeyboardState[SDL_SCANCODE_S] || pKeyboardState[SDL_SCANCODE_DOWN])
 			{
 				origin -= forward * movementSpeed * deltaTime;
 			}
 
-			if (pKeyboardState[SDL_SCANCODE_D])
+			if (pKeyboardState[SDL_SCANCODE_D] || pKeyboardState[SDL_SCANCODE_RIGHT])
 			{
 				origin += right * movementSpeed * deltaTime;
 			}
 
-			if (pKeyboardState[SDL_SCANCODE_A])
+			if (pKeyboardState[SDL_SCANCODE_A] || pKeyboardState[SDL_SCANCODE_LEFT])
 			{
 				origin -= right * movementSpeed * deltaTime;
 			}
